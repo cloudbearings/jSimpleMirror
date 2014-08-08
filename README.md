@@ -1,5 +1,5 @@
 jSimpleMirror
-#############
+=============
 Easy to use and very simple java based program to synchronize data between a master and a slave directory.
 
 Usage
