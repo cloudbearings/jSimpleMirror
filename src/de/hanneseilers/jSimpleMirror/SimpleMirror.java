@@ -3,7 +3,6 @@ package de.hanneseilers.jSimpleMirror;
 import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.File;
-import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -17,7 +16,9 @@ import org.apache.commons.io.filefilter.IOFileFilter;
 
 public class SimpleMirror {
 	
-	private static final String MIRROR_SEPERATOR = ";";
+	public static final boolean LOG_ENABLED = true;
+	private static final String CONFIG_MIRROR_SEPERATOR = ";";
+	private static final String CONFIG_COMMENT = "#";
 	
 	private File mConfigFile = null;
 	private Map<String, String> mMirrors = new HashMap<String, String>();
@@ -29,9 +30,9 @@ public class SimpleMirror {
 	public SimpleMirror(File aConfigFile) {
 		if( aConfigFile.exists() && aConfigFile.canRead() ) {
 			mConfigFile = aConfigFile;
-			System.out.println( "Found config file " + mConfigFile.getAbsolutePath() );
+			log( "Found config file " + mConfigFile.getAbsolutePath() );
 		} else {
-			System.err.println( "Can not find config file " + aConfigFile.getAbsolutePath() );
+			log( "Can not find config file " + aConfigFile.getAbsolutePath(), true );
 		}
 		
 		mMirrors.clear();
@@ -59,7 +60,7 @@ public class SimpleMirror {
 					if( !vSource.isDirectory() || !vDestination.isDirectory() ){
 						throw new IOException( "No directories: " + vSource.getAbsolutePath() + " > " + vDestination.getAbsolutePath() );
 					}					
-					System.out.println( "Checking " + vSource.getAbsolutePath() + " > " + vDestination.getAbsolutePath() );
+					log( "Checking " + vSource.getAbsolutePath() + " > " + vDestination.getAbsolutePath() );
 					
 					// sync files
 					Collection<File> vSourceFiles = getFiles(vSource);
@@ -78,7 +79,7 @@ public class SimpleMirror {
 			}
 			
 		} catch ( Exception e ) {
-			e.printStackTrace();
+			log(e.getMessage(), true);
 		}
 			
 		return false;
@@ -101,6 +102,14 @@ public class SimpleMirror {
 		return vDataEntries;
 	}
 	
+	/**
+	 * Synchronized data between two {@link Collection} of {@link File} objects.
+	 * @param aSourcePath			{@link File} of source root path.
+	 * @param aDestinationPath		{@link File} of destination root path.
+	 * @param aSource				{@link Collection} of source {@link File} objects.
+	 * @param aDestination			{@link Collection} of destination {@link File} objects.
+	 * @throws IOException
+	 */
 	private void syncData(File aSourcePath, File aDestinationPath, Collection<File> aSource, Collection<File> aDestination) throws IOException{
 		
 		Collection<String> vSourceEntries = getDataEntryNames(aSource, aSourcePath.getAbsolutePath());
@@ -119,10 +128,10 @@ public class SimpleMirror {
 				// create directories if neccessary
 				if( vSource.isDirectory() ){
 					vDestination.mkdirs();
-					System.out.println( "Added directory " + vDestination );
+					log( "Added directory " + vDestination );
 				} else {
 					FileUtils.copyFile(vSource, vDestination);
-					System.out.println( "Added file " + vDestination );
+					log( "Added file " + vDestination );
 				}
 			}
 		}
@@ -138,10 +147,10 @@ public class SimpleMirror {
 					&& !vSource.exists() ){
 				if( vDestination.isDirectory() ){
 					FileUtils.deleteDirectory(vDestination);
-					System.out.println( "Deleted directory " + vDestination );
+					log( "Deleted directory " + vDestination );
 				} else {
 					FileUtils.forceDelete(vDestination);
-					System.out.println( "Deleted file " + vDestination );
+					log( "Deleted file " + vDestination );
 				}
 			}
 			
@@ -194,16 +203,41 @@ public class SimpleMirror {
 		
 		String line = null;
 		while( (line = reader.readLine()) != null ){
-			String[] mirror = line.split(MIRROR_SEPERATOR);
-			if( mirror.length > 1 ){
-				String src = mirror[0].trim();
-				String dst = mirror[1].trim();
-				
-				mMirrors.put(src, dst);
+			
+			line = line.trim();
+			if( !line.startsWith(CONFIG_COMMENT) ){
+				String[] mirror = line.split(CONFIG_MIRROR_SEPERATOR);
+				if( mirror.length > 1 ){
+					String src = mirror[0].trim();
+					String dst = mirror[1].trim();
+					
+					mMirrors.put(src, dst);
+				}
 			}
+			
 		}
 		
 		reader.close();
+	}
+	
+	public static void log(String msg){
+		log(msg, false);
+	}
+	
+	/**
+	 * Logging function.
+	 * Checks for {@code LOG_ENABLED}. Only if true message is shown.
+	 * @param msg	{@link String} message to show.
+	 * @param err	If {@code true} message is shown usign error pipe. 
+	 */
+	public static void log(String msg, boolean err){
+		if( LOG_ENABLED ){
+			if( err ){
+				System.err.println( msg );
+			} else {
+				System.out.println( msg );
+			}
+		}
 	}
 
 	/**
@@ -215,10 +249,10 @@ public class SimpleMirror {
 			
 			SimpleMirror mirror = new SimpleMirror( new File(args[0]) );	
 			if( mirror.sync() ){
-				System.out.println( "Synchonisation successfull." );
+				log( "Synchonisation successfull." );
 				System.exit(0);
 			} else {
-				System.err.println( "Synchonisation failed." );
+				log( "Synchonisation failed.", true );
 			}			
 			
 		} else {
