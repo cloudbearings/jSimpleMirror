@@ -32,7 +32,7 @@ public class SimpleMirror {
 			mConfigFile = aConfigFile;
 			log( "Found config file " + mConfigFile.getAbsolutePath() );
 		} else {
-			log( "Can not find config file " + aConfigFile.getAbsolutePath(), true );
+			log( "Can not find config file " + aConfigFile.getAbsolutePath(), true, true );
 		}
 		
 		mMirrors.clear();
@@ -79,7 +79,7 @@ public class SimpleMirror {
 			}
 			
 		} catch ( Exception e ) {
-			log(e.getMessage(), true);
+			log(e.getMessage(), true, true);
 		}
 			
 		return false;
@@ -108,9 +108,8 @@ public class SimpleMirror {
 	 * @param aDestinationPath		{@link File} of destination root path.
 	 * @param aSource				{@link Collection} of source {@link File} objects.
 	 * @param aDestination			{@link Collection} of destination {@link File} objects.
-	 * @throws IOException
 	 */
-	private void syncData(File aSourcePath, File aDestinationPath, Collection<File> aSource, Collection<File> aDestination) throws IOException{
+	private void syncData(File aSourcePath, File aDestinationPath, Collection<File> aSource, Collection<File> aDestination){
 		
 		Collection<String> vSourceEntries = getDataEntryNames(aSource, aSourcePath.getAbsolutePath());
 		Collection<String> vDestinationEntries = getDataEntryNames(aDestination, aDestinationPath.getAbsolutePath());
@@ -122,16 +121,26 @@ public class SimpleMirror {
 			File vSource = new File( aSourcePath + src );
 			File vDestination = new File( aDestinationPath + src );
 			
-			if(  !vSource.equals(aSourcePath)
-					&& (!vDestination.exists() || FileUtils.isFileNewer(vSource, vDestination)) ){
+			if( !vSource.equals(aSourcePath)
+					&& (!vDestination.exists() || vSource.lastModified() > vDestination.lastModified()) ){
 				
-				// create directories if neccessary
-				if( vSource.isDirectory() ){
-					vDestination.mkdirs();
-					log( "Added directory " + vDestination );
-				} else {
-					FileUtils.copyFile(vSource, vDestination);
-					log( "Added file " + vDestination );
+				try{
+					
+					// create data if neccessary
+					if( vSource.isDirectory() ){
+						log( "Adding directory " + vDestination + " ... ", false, false );
+						vDestination.mkdirs();
+						log( "ok" );
+						
+					} else {
+						log( "Adding file " + vDestination + " ... ", false, false );
+						FileUtils.copyFile(vSource, vDestination);
+						log( "ok" );
+						
+					}
+					
+				} catch( IOException e ){
+					log( "failed" );
 				}
 			}
 		}
@@ -145,12 +154,22 @@ public class SimpleMirror {
 			
 			if( !vDestination.equals(aDestinationPath)
 					&& !vSource.exists() ){
-				if( vDestination.isDirectory() ){
-					FileUtils.deleteDirectory(vDestination);
-					log( "Deleted directory " + vDestination );
-				} else {
-					FileUtils.forceDelete(vDestination);
-					log( "Deleted file " + vDestination );
+				
+				try{
+					
+					// delete data if necessary
+					if( vDestination.isDirectory() ){
+						log( "Deleting directory " + vDestination + " ... ", false, false );
+						FileUtils.deleteDirectory(vDestination);
+						log( "ok" );
+					} else {
+						log( "Deleting file " + vDestination + " ... ", false, false );
+						FileUtils.forceDelete(vDestination);
+						log( "ok" );
+					}
+					
+				} catch( IOException e ){
+					log( "failed" );
 				}
 			}
 			
@@ -211,6 +230,13 @@ public class SimpleMirror {
 					String src = mirror[0].trim();
 					String dst = mirror[1].trim();
 					
+					if( src.endsWith("\\") ){
+						src = src.substring(0, src.length()-1);
+					}
+					if( dst.endsWith("\\") ){
+						dst = dst.substring(0, dst.length()-1);
+					}
+					
 					mMirrors.put(src, dst);
 				}
 			}
@@ -221,21 +247,22 @@ public class SimpleMirror {
 	}
 	
 	public static void log(String msg){
-		log(msg, false);
+		log(msg, true, false);
 	}
 	
 	/**
 	 * Logging function.
 	 * Checks for {@code LOG_ENABLED}. Only if true message is shown.
-	 * @param msg	{@link String} message to show.
-	 * @param err	If {@code true} message is shown usign error pipe. 
+	 * @param msg		{@link String} message to show.
+	 * @param err		If {@code true} message is shown using error pipe. 
+	 * @param newline	If {@code true} a lien break is added to end of message
 	 */
-	public static void log(String msg, boolean err){
+	public static void log(String msg, boolean newline, boolean err){
 		if( LOG_ENABLED ){
 			if( err ){
-				System.err.println( msg );
+				System.err.print( msg + (newline ? "\n" : "") );
 			} else {
-				System.out.println( msg );
+				System.out.print( msg + (newline ? "\n" : "") );
 			}
 		}
 	}
@@ -259,7 +286,7 @@ public class SimpleMirror {
 				log( "Synchonisation successfull." );
 				System.exit(0);
 			} else {
-				log( "Synchonisation failed.", true );
+				log( "Synchonisation failed.", true, true );
 			}			
 			
 		} else {
