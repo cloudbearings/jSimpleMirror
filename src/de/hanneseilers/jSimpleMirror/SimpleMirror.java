@@ -1,0 +1,231 @@
+package de.hanneseilers.jSimpleMirror;
+
+import java.io.BufferedReader;
+import java.io.DataInputStream;
+import java.io.File;
+import java.io.FileFilter;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.filefilter.IOFileFilter;
+
+public class SimpleMirror {
+	
+	private static final String MIRROR_SEPERATOR = ";";
+	
+	private File mConfigFile = null;
+	private Map<String, String> mMirrors = new HashMap<String, String>();
+	
+	/**
+	 * Constructor
+	 * @param aConfigFile	Configuration {@link File}
+	 */
+	public SimpleMirror(File aConfigFile) {
+		if( aConfigFile.exists() && aConfigFile.canRead() ) {
+			mConfigFile = aConfigFile;
+			System.out.println( "Found config file " + mConfigFile.getAbsolutePath() );
+		} else {
+			System.err.println( "Can not find config file " + aConfigFile.getAbsolutePath() );
+		}
+		
+		mMirrors.clear();
+	}
+	
+	/**
+	 * Function to synchronize data between directories.
+	 * @return	{@code true} if synchonization was successfull, {@code false} otherwise.
+	 */
+	public boolean sync(){
+		
+		try{
+			
+			if( mConfigFile != null ){
+				
+				// Read mirrors from config file
+				readMirrors();
+				
+				// Sync mirrors
+				for( String src : mMirrors.keySet() ){
+					File vSource = new File(src);
+					File vDestination = new File(mMirrors.get(src));
+					
+					// check if source and destination are directories
+					if( !vSource.isDirectory() || !vDestination.isDirectory() ){
+						throw new IOException( "No directories: " + vSource.getAbsolutePath() + " > " + vDestination.getAbsolutePath() );
+					}					
+					System.out.println( "Checking " + vSource.getAbsolutePath() + " > " + vDestination.getAbsolutePath() );
+					
+					// sync files
+					Collection<File> vSourceFiles = getFiles(vSource);
+					Collection<File> vDestinationFiles = getFiles(vDestination);
+					syncData(vSource, vDestination, vSourceFiles, vDestinationFiles);
+					
+					// sync directories
+					Collection<File> vSourceDirectories = getDirectories(vSource);
+					Collection<File> vDestinationDirectories = getDirectories(vDestination);					
+					syncData(vSource, vDestination, vSourceDirectories, vDestinationDirectories);					
+					
+				}
+				
+				return true;
+				
+			}
+			
+		} catch ( Exception e ) {
+			e.printStackTrace();
+		}
+			
+		return false;
+	}
+	
+	/**
+	 * Extracts entry names from {@link Collection} of {@link File} objects.
+	 * @param aCollection	{@link Collection} of {@link File} objects.
+	 * @param substract		{@link String} to remove from start of data entry name.
+	 * @return				{@link Collection} of data entry name {@link String}.
+	 */
+	private Collection<String> getDataEntryNames(Collection<File> aCollection, String substract){
+		Collection<String> vDataEntries = new ArrayList<String>();
+		
+		for( File f : aCollection ){
+			String vDataEntry = f.getAbsolutePath().replace(substract, "");
+			vDataEntries.add(vDataEntry);
+		}
+		
+		return vDataEntries;
+	}
+	
+	private void syncData(File aSourcePath, File aDestinationPath, Collection<File> aSource, Collection<File> aDestination) throws IOException{
+		
+		Collection<String> vSourceEntries = getDataEntryNames(aSource, aSourcePath.getAbsolutePath());
+		Collection<String> vDestinationEntries = getDataEntryNames(aDestination, aDestinationPath.getAbsolutePath());
+		
+		// add new data
+		for( String src : vSourceEntries ){
+			
+			// check if to copy src to destination
+			File vSource = new File( aSourcePath + src );
+			File vDestination = new File( aDestinationPath + src );
+			
+			if(  !vSource.equals(aSourcePath)
+					&& (!vDestination.exists() || FileUtils.isFileNewer(vSource, vDestination)) ){
+				
+				// create directories if neccessary
+				if( vSource.isDirectory() ){
+					vDestination.mkdirs();
+					System.out.println( "Added directory " + vDestination );
+				} else {
+					FileUtils.copyFile(vSource, vDestination);
+					System.out.println( "Added file " + vDestination );
+				}
+			}
+		}
+		
+		// remove old data
+		for( String dst : vDestinationEntries ){
+		
+			// check if to delete dst 
+			File vSource = new File( aSourcePath + dst );
+			File vDestination = new File( aDestinationPath + dst );
+			
+			if( !vDestination.equals(aDestinationPath)
+					&& !vSource.exists() ){
+				if( vDestination.isDirectory() ){
+					FileUtils.deleteDirectory(vDestination);
+					System.out.println( "Deleted directory " + vDestination );
+				} else {
+					FileUtils.forceDelete(vDestination);
+					System.out.println( "Deleted file " + vDestination );
+				}
+			}
+			
+		}
+	}
+	
+	/**
+	 * Gets files with subdirectories from a source path.
+	 * @param aSource	{@link File} source path
+	 * @return			{@link Collection} of {@link File} objects within source path.
+	 */
+	private Collection<File> getFiles(File aSource){
+		return FileUtils.listFiles(aSource, null, true);
+	}
+	
+	/**
+	 * Gets directories from source path. 
+	 * @param aSource	{@link File} source path
+	 * @return			{@link Collection} of {@link File} directory objects wothin source path.
+	 */
+	private Collection<File> getDirectories(File aSource){
+		Collection<File> vDirectories = new ArrayList<File>();
+		IOFileFilter vFilter = new IOFileFilter() {			
+			@Override
+			public boolean accept(File arg0, String arg1) {
+				return true;
+			}			
+			@Override
+			public boolean accept(File arg0) {
+				return true;
+			}
+		};
+		
+		for( File dir : FileUtils.listFilesAndDirs(aSource, vFilter, vFilter) ){
+			if( dir.isDirectory() ){
+				vDirectories.add(dir);
+			}
+		}
+		return vDirectories;
+	}
+	
+	
+	/**
+	 * Reads mirrors configuration from config file
+	 * @throws IOException 
+	 */
+	private void readMirrors() throws IOException{
+		BufferedReader reader = new BufferedReader(
+				new InputStreamReader( new DataInputStream( new FileInputStream(mConfigFile) ) ) );
+		
+		String line = null;
+		while( (line = reader.readLine()) != null ){
+			String[] mirror = line.split(MIRROR_SEPERATOR);
+			if( mirror.length > 1 ){
+				String src = mirror[0].trim();
+				String dst = mirror[1].trim();
+				
+				mMirrors.put(src, dst);
+			}
+		}
+		
+		reader.close();
+	}
+
+	/**
+	 * MAIN FUNCTION
+	 * @param args	{@link String} array of program arguments
+	 */
+	public static void main(String[] args) {
+		if( args.length > 0 ){			
+			
+			SimpleMirror mirror = new SimpleMirror( new File(args[0]) );	
+			if( mirror.sync() ){
+				System.out.println( "Synchonisation successfull." );
+				System.exit(0);
+			} else {
+				System.err.println( "Synchonisation failed." );
+			}			
+			
+		} else {
+			System.err.println( "SimpleMirror Syntax: java -jar simplemirror.jar <config-file>" );
+		}
+		
+		System.exit(-1);
+	}
+
+}
