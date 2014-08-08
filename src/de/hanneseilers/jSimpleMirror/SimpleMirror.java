@@ -16,7 +16,7 @@ import org.apache.commons.io.filefilter.IOFileFilter;
 
 public class SimpleMirror {
 	
-	public static final boolean LOG_ENABLED = true;
+	public static boolean LOG_ENABLED = true;
 	private static final String CONFIG_MIRROR_SEPERATOR = ";";
 	private static final String CONFIG_COMMENT = "#";
 	
@@ -247,6 +247,13 @@ public class SimpleMirror {
 	public static void main(String[] args) {
 		if( args.length > 0 ){			
 			
+			// check if to show log
+			if( args.length > 1 ){
+				if( args[1].equals("-q") || args[1].equals("-quiet") ){
+					LOG_ENABLED = false;
+				}
+			}
+			
 			SimpleMirror mirror = new SimpleMirror( new File(args[0]) );	
 			if( mirror.sync() ){
 				log( "Synchonisation successfull." );
@@ -256,7 +263,9 @@ public class SimpleMirror {
 			}			
 			
 		} else {
-			System.err.println( "SimpleMirror Syntax: java -jar simplemirror.jar <config-file>" );
+			System.err.println( "SimpleMirror Syntax: java -jar simplemirror.jar <config-file> [-q | -quiet]" );
+			System.err.println( "-quiet\tno console output" );
+			System.err.println( "-q\tsee quiet" );
 		}
 		
 		System.exit(-1);
