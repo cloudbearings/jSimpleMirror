@@ -1,5 +1,6 @@
 package de.hanneseilers.jSimpleMirror;
 
+import java.awt.TrayIcon.MessageType;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -52,8 +53,11 @@ public class SyncManager {
 					// sync directories
 					Collection<File> vSourceDirectories = getDirectories(vSource);
 					Collection<File> vDestinationDirectories = getDirectories(vDestination);					
-					syncData(vSource, vDestination, vSourceDirectories, vSourceDirectories, vDestinationDirectories);					
+					syncData(vSource, vDestination, vSourceDirectories, vSourceDirectories, vDestinationDirectories);
 					
+					TrayManager.showNotification("Update",
+							"Synchronized " + vSourceFilesChanges.size() + " File(s).",
+							MessageType.INFO);					
 				}
 				
 				return true;

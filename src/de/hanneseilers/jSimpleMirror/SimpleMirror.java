@@ -1,5 +1,6 @@
 package de.hanneseilers.jSimpleMirror;
 
+import java.awt.Toolkit;
 import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.FileInputStream;
@@ -13,6 +14,9 @@ public class SimpleMirror {
 	public static boolean LOG_ENABLED = true;
 	public static boolean START_SERVICE = false;
 	public static String CONFIG_FILE = "config.cfg";
+	
+	public static final String TRAY_ICON_FILE = "jsimplemirror.png";
+	public static final String TRAY_TOOLTIP = "Simple Mirror Sync";
 	
 	private static final String CONFIG_MIRROR_SEPERATOR = ";";
 	private static final String CONFIG_COMMENT = "#";
@@ -86,7 +90,10 @@ public class SimpleMirror {
 	 */
 	public static void main(String[] args) {
 		
+		// create sync manager and tray icon
 		SyncManager manager = new SyncManager();
+		TrayManager.createTrayIcon(
+				Toolkit.getDefaultToolkit().getImage(SimpleMirror.TRAY_ICON_FILE), SimpleMirror.TRAY_TOOLTIP);
 		
 		// check program arguments
 		for( String arg : args ){
@@ -124,6 +131,8 @@ public class SimpleMirror {
 			SimpleMirror.err("Can not read mirrors from " + SimpleMirror.CONFIG_FILE);
 		}
 		
+		// remove tray icon
+		TrayManager.removeTrayIcon();
 	}
 
 }
