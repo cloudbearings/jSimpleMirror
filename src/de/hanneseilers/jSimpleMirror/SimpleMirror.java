@@ -9,11 +9,25 @@ import java.io.InputStreamReader;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Gloabl class with main function, log functions and configuration attributes.
+ * @author Hannes Eilers
+ *
+ */
 public class SimpleMirror {
 	
 	public static boolean LOG_ENABLED = true;
+	public static String CONFIG_FILE = "config.cfg";	
 	public static boolean START_SERVICE = false;
-	public static String CONFIG_FILE = "config.cfg";
+	
+	public static long SYNC_RATE = 5000;
+	public static boolean SYNC_FILES = true;
+	public static boolean SYNC_DIRECTORIES = true;
+	public static boolean SYNC_DELETE_ON_SLAVE = true;
+	public static boolean SYNC_PAUSE = false;
+	public static boolean SYNC_STOP = false;	
+	
+	public static SyncService sSyncService;
 	
 	public static final String TRAY_ICON_FILE = "jsimplemirror.png";
 	public static final String TRAY_TOOLTIP = "Simple Mirror Sync";
@@ -119,20 +133,31 @@ public class SimpleMirror {
 			
 		}
 		
-		// first sync files
-		try {
-			manager.setMirrors( SimpleMirror.readMirrors() );
-			if( manager.sync() ){
-				SimpleMirror.log("Synchronized");
-			} else {
-				SimpleMirror.err("Error while synchronizing");
+		// start sync service
+		if( SimpleMirror.START_SERVICE ){
+			// background sync thread
+			SimpleMirror.sSyncService = new SyncService(manager);
+			new Thread(sSyncService).start();
+			
+			// background keep alive thread
+			new Thread(new KeepAliveThread()).start();
+		}
+		else{
+			
+			try {
+				manager.setMirrors( SimpleMirror.readMirrors() );
+				if( manager.sync() ){
+					SimpleMirror.log("Synchronized");
+				} else {
+					SimpleMirror.err("Error while synchronizing");
+				}
+			} catch (IOException e) {
+				SimpleMirror.err("Can not read mirrors from " + SimpleMirror.CONFIG_FILE);
 			}
-		} catch (IOException e) {
-			SimpleMirror.err("Can not read mirrors from " + SimpleMirror.CONFIG_FILE);
+			
 		}
 		
-		// remove tray icon
-		TrayManager.removeTrayIcon();
+		
 	}
 
 }

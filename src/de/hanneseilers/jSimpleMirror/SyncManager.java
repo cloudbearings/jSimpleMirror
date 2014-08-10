@@ -11,6 +11,11 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.filefilter.IOFileFilter;
 
+/**
+ * Class to sync data between mirrors.
+ * @author Hannes Eilers
+ *
+ */
 public class SyncManager {
 	
 	private Map<String, String> mMirrors = null;
@@ -32,6 +37,9 @@ public class SyncManager {
 				
 				// Sync mirrors
 				for( String src : mMirrors.keySet() ){
+					// wait for unpause
+					while( SimpleMirror.SYNC_PAUSE );
+					
 					File vSource = new File(src);
 					File vDestination = new File(mMirrors.get(src));
 					
@@ -42,22 +50,30 @@ public class SyncManager {
 					SimpleMirror.log( "Checking " + vSource.getAbsolutePath() + " > " + vDestination.getAbsolutePath() );
 					
 					// sync files
-					Collection<File> vSourceFiles = getFiles(vSource);
-					Collection<File> vSourceFilesChanges = getChangesFromCache(src, vSourceFiles);
-					Collection<File> vDestinationFiles = getFiles(vDestination);
-					syncData(vSource, vDestination, vSourceFilesChanges, vSourceFiles, vDestinationFiles);
-					
-					// update file cache
-					updateCache(src, vSourceFiles);
+					long vUpdatedFiles = 0;
+					if( SimpleMirror.SYNC_FILES ){
+						Collection<File> vSourceFiles = getFiles(vSource);
+						Collection<File> vSourceFilesChanges = getChangesFromCache(src, vSourceFiles);
+						Collection<File> vDestinationFiles = getFiles(vDestination);
+						vUpdatedFiles = syncData(vSource, vDestination, vSourceFilesChanges, vSourceFiles, vDestinationFiles);
+						
+						// update file cache
+						updateCache(src, vSourceFiles);
+					}
 					
 					// sync directories
-					Collection<File> vSourceDirectories = getDirectories(vSource);
-					Collection<File> vDestinationDirectories = getDirectories(vDestination);					
-					syncData(vSource, vDestination, vSourceDirectories, vSourceDirectories, vDestinationDirectories);
+					long vUpdatedDirectories = 0;
+					if( SimpleMirror.SYNC_DIRECTORIES ){
+						Collection<File> vSourceDirectories = getDirectories(vSource);
+						Collection<File> vDestinationDirectories = getDirectories(vDestination);					
+						vUpdatedDirectories = syncData(vSource, vDestination, vSourceDirectories, vSourceDirectories, vDestinationDirectories);
+					}
 					
-					TrayManager.showNotification("Update",
-							"Synchronized " + vSourceFilesChanges.size() + " File(s).",
-							MessageType.INFO);					
+					if( vUpdatedFiles > 0 || vUpdatedDirectories > 0 ){
+						TrayManager.showNotification("Update",
+								"Synchronized " + vUpdatedFiles+ " File(s) and " + vUpdatedDirectories + " Directories.",
+								MessageType.NONE);
+					}
 				}
 				
 				return true;
@@ -135,14 +151,18 @@ public class SyncManager {
 	 * @param aSourceChanges		{@link Collection} of changed source {@link File} objects.
 	 * @param aSource				{@link Collection} of source {@link File} objects.
 	 * @param aDestination			{@link Collection} of destination {@link File} objects.
+	 * @return						{@link Long} number of updates
 	 */
-	private void syncData(File aSourcePath, File aDestinationPath, Collection<File> aSourceChanges, Collection<File> aSource, Collection<File> aDestination){
+	private long syncData(File aSourcePath, File aDestinationPath, Collection<File> aSourceChanges, Collection<File> aSource, Collection<File> aDestination){
 		
+		long vUpdates = 0;
 		Collection<String> vSourceEntries = getDataEntryNames(aSourceChanges, aSourcePath.getAbsolutePath());
 		Collection<String> vDestinationEntries = getDataEntryNames(aDestination, aDestinationPath.getAbsolutePath());
 		
 		// add new data
 		for( String src : vSourceEntries ){
+			// wait for unpause
+			while( SimpleMirror.SYNC_PAUSE );
 			
 			// check if to copy src to destination
 			File vSource = new File( aSourcePath + src );
@@ -157,11 +177,13 @@ public class SyncManager {
 					if( vSource.isDirectory() ){
 						SimpleMirror.log( "Adding directory " + vDestination + " ... ", false, false );
 						vDestination.mkdirs();
+						vUpdates++;
 						SimpleMirror.log( "ok" );
 						
 					} else {
 						SimpleMirror.log( "Adding file " + vDestination + " ... ", false, false );
 						FileUtils.copyFile(vSource, vDestination);
+						vUpdates++;
 						SimpleMirror.log( "ok" );
 						
 					}
@@ -173,34 +195,42 @@ public class SyncManager {
 		}
 		
 		// remove old data
-		for( String dst : vDestinationEntries ){
-		
-			// check if to delete dst 
-			File vSource = new File( aSourcePath + dst );
-			File vDestination = new File( aDestinationPath + dst );
+		if( SimpleMirror.SYNC_DELETE_ON_SLAVE ){
+			for( String dst : vDestinationEntries ){
+				// wait for unpause
+				while( SimpleMirror.SYNC_PAUSE );
 			
-			if( !vDestination.equals(aDestinationPath)
-					&& !vSource.exists() ){
+				// check if to delete dst 
+				File vSource = new File( aSourcePath + dst );
+				File vDestination = new File( aDestinationPath + dst );
 				
-				try{
+				if( !vDestination.equals(aDestinationPath)
+						&& !vSource.exists() ){
 					
-					// delete data if necessary
-					if( vDestination.isDirectory() ){
-						SimpleMirror.log( "Deleting directory " + vDestination + " ... ", false, false );
-						FileUtils.deleteDirectory(vDestination);
-						SimpleMirror.log( "ok" );
-					} else {
-						SimpleMirror.log( "Deleting file " + vDestination + " ... ", false, false );
-						FileUtils.forceDelete(vDestination);
-						SimpleMirror.log( "ok" );
+					try{
+						
+						// delete data if necessary
+						if( vDestination.isDirectory() ){
+							SimpleMirror.log( "Deleting directory " + vDestination + " ... ", false, false );
+							FileUtils.deleteDirectory(vDestination);
+							vUpdates++;
+							SimpleMirror.log( "ok" );
+						} else {
+							SimpleMirror.log( "Deleting file " + vDestination + " ... ", false, false );
+							FileUtils.forceDelete(vDestination);
+							vUpdates++;
+							SimpleMirror.log( "ok" );
+						}
+						
+					} catch( IOException e ){
+						SimpleMirror.log( "failed" );
 					}
-					
-				} catch( IOException e ){
-					SimpleMirror.log( "failed" );
 				}
+				
 			}
-			
 		}
+		
+		return vUpdates;
 	}
 	
 	/**
