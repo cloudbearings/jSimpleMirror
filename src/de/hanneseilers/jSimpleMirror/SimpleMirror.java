@@ -155,6 +155,7 @@ public class SimpleMirror {
 				SimpleMirror.err("Can not read mirrors from " + SimpleMirror.CONFIG_FILE);
 			}
 			
+			TrayManager.removeTrayIcon();			
 		}
 		
 		
