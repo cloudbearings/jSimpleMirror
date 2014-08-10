@@ -65,7 +65,7 @@ public class SyncManager {
 					long vUpdatedDirectories = 0;
 					if( SimpleMirror.SYNC_DIRECTORIES ){
 						Collection<File> vSourceDirectories = getDirectories(vSource);
-						Collection<File> vDestinationDirectories = getDirectories(vDestination);					
+						Collection<File> vDestinationDirectories = getDirectories(vDestination);
 						vUpdatedDirectories = syncData(vSource, vDestination, vSourceDirectories, vSourceDirectories, vDestinationDirectories);
 					}
 					
@@ -162,7 +162,9 @@ public class SyncManager {
 		// add new data
 		for( String src : vSourceEntries ){
 			// wait for unpause
-			while( SimpleMirror.SYNC_PAUSE );
+			while( SimpleMirror.SYNC_PAUSE ){
+				SimpleMirror.log("pause");
+			};
 			
 			// check if to copy src to destination
 			File vSource = new File( aSourcePath + src );
