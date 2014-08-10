@@ -2,4 +2,4 @@
 echo ---------------------------------
 echo jSimpleMirror
 echo ---------------------------------
-java -jar simplemonitor.jar config.cfg
+java -jar simplemirror.jar config.cfg
