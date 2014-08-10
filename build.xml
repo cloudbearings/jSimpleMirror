@@ -3,13 +3,13 @@
     <!--this file was created by Eclipse Runnable JAR Export Wizard-->
     <!--ANT 1.7 is required                                        -->
     <target name="create_run_jar">
-        <jar destfile="D:/workspace/jSimpleMirror/simplemonitor.jar" filesetmanifest="mergewithoutmain">
+        <jar destfile="simplemirror.jar" filesetmanifest="mergewithoutmain">
             <manifest>
                 <attribute name="Main-Class" value="de.hanneseilers.jSimpleMirror.SimpleMirror"/>
                 <attribute name="Class-Path" value="."/>
             </manifest>
-            <fileset dir="D:/workspace/jSimpleMirror/bin"/>
-            <zipfileset excludes="META-INF/*.SF" src="D:/workspace/jSimpleMirror/commons-io-2.4.jar"/>
+            <fileset dir="bin"/>
+            <zipfileset excludes="META-INF/*.SF" src="commons-io-2.4.jar"/>
         </jar>
     </target>
 </project>
